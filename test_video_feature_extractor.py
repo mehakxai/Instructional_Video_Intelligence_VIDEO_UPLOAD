@@ -8,6 +8,14 @@ import video_feature_extractor as vfe
 
 
 class FindFFmpegTests(unittest.TestCase):
+    def test_add_ffmpeg_to_path_exposes_binary_directory(self):
+        with patch.dict("video_feature_extractor.os.environ", {"PATH": "existing"}):
+            vfe._add_ffmpeg_to_path("/tmp/ffmpeg-bin/ffmpeg")
+            self.assertEqual(
+                vfe.os.environ["PATH"],
+                str(vfe.Path("/tmp/ffmpeg-bin")) + os.pathsep + "existing",
+            )
+
     @patch("video_feature_extractor.shutil.which", return_value="C:/ffmpeg/bin/ffmpeg.exe")
     def test_find_ffmpeg_executable_uses_path_when_available(self, mock_which):
         self.assertEqual(vfe.find_ffmpeg_executable(), "C:/ffmpeg/bin/ffmpeg.exe")

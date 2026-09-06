@@ -47,6 +47,13 @@ def find_ffmpeg_executable():
 
     return None
 
+
+def _add_ffmpeg_to_path(ffmpeg):
+    ffmpeg_dir = str(Path(ffmpeg).parent)
+    path_entries = os.environ.get("PATH", "").split(os.pathsep)
+    if ffmpeg_dir not in path_entries:
+        os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
+
 def meta(path):
     import cv2
     cap=cv2.VideoCapture(str(path)); fps=cap.get(cv2.CAP_PROP_FPS) or 0; n=cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
@@ -148,7 +155,13 @@ def transcript_features(path,model_name="base"):
     from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
     with tempfile.TemporaryDirectory() as td:
         wav=Path(td)/"audio.wav"; audio_to_wav(path,wav)
-        result=whisper.load_model(model_name).transcribe(str(wav),fp16=False,verbose=False)
+        ffmpeg=find_ffmpeg_executable()
+        previous_path=os.environ.get("PATH", "")
+        _add_ffmpeg_to_path(ffmpeg)
+        try:
+            result=whisper.load_model(model_name).transcribe(str(wav),fp16=False,verbose=False)
+        finally:
+            os.environ["PATH"]=previous_path
     text=result.get("text","") or ""; segs=result.get("segments",[]) or []
     wpm=len(text.split())/(dur/60) if dur>0 else 0.0
     vader=SentimentIntensityAnalyzer()
