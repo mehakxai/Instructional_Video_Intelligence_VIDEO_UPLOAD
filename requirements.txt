@@ -1,0 +1,8 @@
+streamlit>=1.37
+pandas>=2.0
+numpy==1.26.4
+opencv-python-headless==4.10.0.84
+scenedetect==0.7.1
+vaderSentiment>=3.3.2
+imageio-ffmpeg>=0.5.1
+openai-whisper>=20240930
