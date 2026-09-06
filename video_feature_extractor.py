@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 import shutil
 import tempfile, subprocess
+import wave
 import numpy as np
 
 
@@ -146,6 +147,24 @@ def audio_to_wav(video,wav):
 
     raise RuntimeError(f"FFmpeg audio extraction failed: {err}")
 
+
+def _read_wav_samples(wav):
+    with wave.open(str(wav), "rb") as audio:
+        frames = audio.readframes(audio.getnframes())
+        channels = audio.getnchannels()
+        sample_width = audio.getsampwidth()
+    if sample_width == 1:
+        samples = (np.frombuffer(frames, dtype=np.uint8).astype(np.float32) - 128) / 128
+    elif sample_width == 2:
+        samples = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768
+    elif sample_width == 4:
+        samples = np.frombuffer(frames, dtype=np.int32).astype(np.float32) / 2147483648
+    else:
+        raise ValueError(f"Unsupported WAV sample width: {sample_width} bytes")
+    if channels > 1:
+        samples = samples.reshape(-1, channels).mean(axis=1)
+    return samples
+
 def transcript_features(path,model_name="base"):
     _,_,dur=meta(path)
     try:
@@ -155,13 +174,8 @@ def transcript_features(path,model_name="base"):
     from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
     with tempfile.TemporaryDirectory() as td:
         wav=Path(td)/"audio.wav"; audio_to_wav(path,wav)
-        ffmpeg=find_ffmpeg_executable()
-        previous_path=os.environ.get("PATH", "")
-        _add_ffmpeg_to_path(ffmpeg)
-        try:
-            result=whisper.load_model(model_name).transcribe(str(wav),fp16=False,verbose=False)
-        finally:
-            os.environ["PATH"]=previous_path
+        audio=_read_wav_samples(wav)
+        result=whisper.load_model(model_name).transcribe(audio,fp16=False,verbose=False)
     text=result.get("text","") or ""; segs=result.get("segments",[]) or []
     wpm=len(text.split())/(dur/60) if dur>0 else 0.0
     vader=SentimentIntensityAnalyzer()

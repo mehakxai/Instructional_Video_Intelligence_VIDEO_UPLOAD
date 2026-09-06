@@ -2,12 +2,26 @@ import os
 import subprocess
 import tempfile
 import unittest
+import wave
 from unittest.mock import patch
 
 import video_feature_extractor as vfe
 
 
 class FindFFmpegTests(unittest.TestCase):
+    def test_read_wav_samples_decodes_pcm_audio(self):
+        with tempfile.TemporaryDirectory() as td:
+            audio_path = os.path.join(td, "audio.wav")
+            with wave.open(audio_path, "wb") as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(16000)
+                wav.writeframes(b"\x00\x00\xff\x7f\x00\x80")
+            samples = vfe._read_wav_samples(audio_path)
+        self.assertEqual(samples.shape, (3,))
+        self.assertAlmostEqual(float(samples[1]), 32767 / 32768, places=5)
+        self.assertAlmostEqual(float(samples[2]), -1.0, places=5)
+
     def test_add_ffmpeg_to_path_exposes_binary_directory(self):
         with patch.dict("video_feature_extractor.os.environ", {"PATH": "existing"}):
             vfe._add_ffmpeg_to_path("/tmp/ffmpeg-bin/ffmpeg")
